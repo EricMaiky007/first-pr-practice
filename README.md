@@ -1,11 +1,11 @@
 # First PR Practice
 
-This is a practice repository for learnig how to submit a pull request on GitHub.
+This is a practice repository for learning how to submit a pull request on GitHub.
 
 ## About
 
-This projet contains a tiny example program. The goal is to get familar with the
-git and GitHub workflow: create a branch, commit, push, and open a pull reqest.
+This project contains a tiny example program. The goal is to get familiar with the
+git and GitHub workflow: create a branch, commit, push, and open a pull request.
 
 ## Usage
 
