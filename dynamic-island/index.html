@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>灵动岛 Dynamic Island Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --island-bg: #000;
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease: cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(circle at 50% 0%, #2c2c3a 0%, #16161d 45%, #0a0a0f 100%);
+    color: #fff;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    padding: 0 16px 40px;
+  }
+
+  /* ---- 顶部灵动岛区域 ---- */
+  .stage {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding-top: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .island {
+    background: var(--island-bg);
+    color: #fff;
+    border-radius: 999px;
+    min-width: 124px;
+    height: 37px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+    transition:
+      width 0.55s var(--spring),
+      height 0.55s var(--spring),
+      min-width 0.55s var(--spring),
+      border-radius 0.45s var(--ease);
+    will-change: width, height;
+    user-select: none;
+  }
+
+  /* 各状态尺寸 */
+  .island[data-state="idle"]      { width: 124px; }
+  .island[data-state="music"]     { width: 340px; max-width: calc(100vw - 32px); }
+  .island[data-state="call"]      { width: 340px; max-width: calc(100vw - 32px); }
+  .island[data-state="timer"]     { width: 250px; }
+  .island[data-state="charging"]  { width: 230px; }
+  .island[data-state="faceid"]    { width: 200px; height: 200px; border-radius: 40px; }
+
+  .island[data-state="music-expanded"],
+  .island[data-state="call-expanded"] {
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    height: 168px;
+    border-radius: 36px;
+  }
+
+  /* 内容层：默认全部隐藏，按状态显示 */
+  .panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s var(--ease);
+  }
+  .island[data-state="idle"]            .panel--idle,
+  .island[data-state="music"]           .panel--music,
+  .island[data-state="music-expanded"]  .panel--music-x,
+  .island[data-state="call"]            .panel--call,
+  .island[data-state="call-expanded"]   .panel--call-x,
+  .island[data-state="timer"]           .panel--timer,
+  .island[data-state="charging"]        .panel--charging,
+  .island[data-state="faceid"]          .panel--faceid {
+    opacity: 1;
+    transition-delay: 0.15s;
+  }
+
+  .island-inner { position: relative; width: 100%; height: 100%; }
+
+  /* idle：模拟前置摄像头小圆点 */
+  .panel--idle { justify-content: center; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #1c1c22; }
+
+  /* 通用左右布局 */
+  .row { display: flex; align-items: center; width: 100%; padding: 0 12px; gap: 10px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .thumb {
+    width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+    background: linear-gradient(135deg, #ff6ad5, #ff9a3c);
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .thumb.blue { background: linear-gradient(135deg, #34c759, #30d158); }
+  .thumb.big { width: 54px; height: 54px; border-radius: 14px; font-size: 26px; }
+
+  .title { font-size: 13px; font-weight: 600; }
+  .sub { font-size: 11px; opacity: 0.6; }
+
+  /* 音乐条形律动 */
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+  .bars span {
+    width: 3px; background: #34c759; border-radius: 2px;
+    animation: bounce 0.9s ease-in-out infinite;
+  }
+  .bars span:nth-child(2){ animation-delay: 0.15s; }
+  .bars span:nth-child(3){ animation-delay: 0.3s; }
+  .bars span:nth-child(4){ animation-delay: 0.45s; }
+  @keyframes bounce { 0%,100%{ height:4px } 50%{ height:16px } }
+
+  /* 展开态大布局 */
+  .expanded { flex-direction: column; padding: 16px 18px; gap: 12px; justify-content: center; }
+  .expanded .top { display: flex; align-items: center; gap: 12px; width: 100%; }
+  .expanded .controls { display: flex; align-items: center; justify-content: center; gap: 26px; width: 100%; }
+  .ctrl { font-size: 22px; opacity: 0.9; cursor: pointer; }
+  .ctrl.play { font-size: 26px; }
+  .progress { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.2); overflow: hidden; }
+  .progress > i { display: block; height: 100%; width: 40%; background: #fff; border-radius: 2px; animation: fill 8s linear infinite; }
+  @keyframes fill { from{ width: 5% } to{ width: 95% } }
+
+  /* 来电按钮 */
+  .call-btns { display: flex; gap: 14px; margin-left: auto; }
+  .cbtn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .cbtn.decline { background: #ff3b30; }
+  .cbtn.accept { background: #34c759; }
+  .expanded .call-btns { margin-left: 0; justify-content: center; }
+  .cbtn.big { width: 58px; height: 58px; font-size: 24px; }
+
+  /* 计时器 */
+  .timer-num { font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; margin-left: auto; color: #ff9f0a; }
+
+  /* 充电 */
+  .charge-pct { margin-left: auto; font-size: 14px; font-weight: 600; color: #30d158; }
+
+  /* faceid */
+  .panel--faceid { flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
+  .faceid-ring {
+    width: 62px; height: 62px; border-radius: 18px;
+    border: 3px solid #34c759;
+    display: flex; align-items: center; justify-content: center; font-size: 30px;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{ transform: scale(1); opacity:1 } 50%{ transform: scale(1.08); opacity:0.75 } }
+  .panel--faceid .fx-label { font-size: 13px; opacity: 0.8; }
+
+  /* ---- 页面说明与按钮 ---- */
+  .hero {
+    text-align: center; margin: 46px 0 8px; max-width: 480px;
+  }
+  .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .hero p { margin-top: 8px; font-size: 14px; line-height: 1.6; opacity: 0.6; }
+  .hint { font-size: 12px; opacity: 0.45; margin-top: 6px; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 12px; width: 100%; max-width: 420px; margin-top: 28px;
+  }
+  .card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 0.2s var(--spring), background 0.2s;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .card:active { transform: scale(0.96); background: rgba(255,255,255,0.12); }
+  .card.active { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.25); }
+  .card .emoji { font-size: 22px; }
+  .card .name { font-size: 14px; font-weight: 600; }
+  .card .desc { font-size: 11px; opacity: 0.5; }
+
+  footer { margin-top: 34px; font-size: 11px; opacity: 0.35; text-align: center; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="island" id="island" data-state="idle">
+      <div class="island-inner">
+
+        <!-- idle -->
+        <div class="panel panel--idle">
+          <div class="dot"></div>
+        </div>
+
+        <!-- music (compact) -->
+        <div class="panel panel--music">
+          <div class="row">
+            <div class="thumb">🎵</div>
+            <div class="grow">
+              <div class="title truncate">夜曲</div>
+              <div class="sub truncate">周杰伦</div>
+            </div>
+            <div class="bars"><span></span><span></span><span></span><span></span></div>
+          </div>
+        </div>
+
+        <!-- music expanded -->
+        <div class="panel panel--music-x">
+          <div class="row expanded">
+            <div class="top">
+              <div class="thumb big">🎵</div>
+              <div class="grow">
+                <div class="title truncate">夜曲</div>
+                <div class="sub truncate">周杰伦 · 十一月的萧邦</div>
+              </div>
+            </div>
+            <div class="progress"><i></i></div>
+            <div class="controls">
+              <div class="ctrl">⏮</div>
+              <div class="ctrl play">⏸</div>
+              <div class="ctrl">⏭</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- call (compact) -->
+        <div class="panel panel--call">
+          <div class="row">
+            <div class="thumb blue">👤</div>
+            <div class="grow">
+              <div class="title truncate">来电</div>
+              <div class="sub truncate">妈妈</div>
+            </div>
+            <div class="call-btns">
+              <div class="cbtn decline">✕</div>
+              <div class="cbtn accept">✆</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- call expanded -->
+        <div class="panel panel--call-x">
+          <div class="row expanded">
+            <div class="top">
+              <div class="thumb big blue">👤</div>
+              <div class="grow">
+                <div class="title truncate">妈妈</div>
+                <div class="sub truncate">iPhone 来电…</div>
+              </div>
+            </div>
+            <div class="call-btns">
+              <div class="cbtn decline big">✕</div>
+              <div class="cbtn accept big">✆</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- timer -->
+        <div class="panel panel--timer">
+          <div class="row">
+            <div class="thumb" style="background:linear-gradient(135deg,#ff9f0a,#ff375f)">⏱</div>
+            <div class="grow"><div class="title">计时器</div></div>
+            <div class="timer-num" id="timerNum">00:59</div>
+          </div>
+        </div>
+
+        <!-- charging -->
+        <div class="panel panel--charging">
+          <div class="row">
+            <div class="thumb blue">⚡️</div>
+            <div class="grow"><div class="title">正在充电</div></div>
+            <div class="charge-pct">82%</div>
+          </div>
+        </div>
+
+        <!-- faceid -->
+        <div class="panel panel--faceid">
+          <div class="faceid-ring">🔒</div>
+          <div class="fx-label">Face ID</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>灵动岛 Dynamic Island</h1>
+    <p>纯 HTML / CSS / JS 实现的灵动岛动效 demo。点上面的小黑条，或选下面的场景切换状态。</p>
+    <p class="hint">📱 提示：用手机浏览器打开，把它放到屏幕顶部最像～</p>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="card" data-target="music"><div class="emoji">🎵</div><div class="name">音乐播放</div><div class="desc">点岛可展开控制</div></div>
+    <div class="card" data-target="call"><div class="emoji">📞</div><div class="name">来电</div><div class="desc">接听 / 挂断</div></div>
+    <div class="card" data-target="timer"><div class="emoji">⏱</div><div class="name">计时器</div><div class="desc">倒计时中</div></div>
+    <div class="card" data-target="charging"><div class="emoji">⚡️</div><div class="name">充电</div><div class="desc">电量提示</div></div>
+    <div class="card" data-target="faceid"><div class="emoji">🔒</div><div class="name">Face ID</div><div class="desc">解锁动画</div></div>
+    <div class="card" data-target="idle"><div class="emoji">⚫️</div><div class="name">收起</div><div class="desc">回到默认</div></div>
+  </div>
+
+  <footer>
+    First PR Practice · Dynamic Island Demo<br>
+    这是网页模拟效果，并非真机灵动岛。
+  </footer>
+
+<script>
+  const island = document.getElementById('island');
+  const grid = document.getElementById('grid');
+
+  function setState(state) {
+    island.dataset.state = state;
+    // 更新卡片高亮
+    const base = state.replace('-expanded', '');
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('active', c.dataset.target === base);
+    });
+  }
+
+  // 点击卡片切换
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    if (card) setState(card.dataset.target);
+  });
+
+  // 点击灵动岛本体：可展开/收起的状态之间切换
+  island.addEventListener('click', () => {
+    const s = island.dataset.state;
+    if (s === 'music') return setState('music-expanded');
+    if (s === 'music-expanded') return setState('music');
+    if (s === 'call') return setState('call-expanded');
+    if (s === 'call-expanded') return setState('call');
+    if (s === 'idle') return setState('music'); // 默认态点一下来个音乐
+    setState('idle'); // 其他态点一下收起
+  });
+
+  // 简易倒计时（仅计时器状态可见时视觉刷新）
+  let remaining = 59;
+  setInterval(() => {
+    remaining = remaining > 0 ? remaining - 1 : 59;
+    const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+    const ss = String(remaining % 60).padStart(2, '0');
+    document.getElementById('timerNum').textContent = `${mm}:${ss}`;
+  }, 1000);
+</script>
+</body>
+</html>
